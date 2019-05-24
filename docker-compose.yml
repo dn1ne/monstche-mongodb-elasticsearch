@@ -1,0 +1,89 @@
+version: '2.3'
+
+services:
+  mongo1:
+    container_name: mongo1
+    image: mongo:latest
+    ports:
+      - "27117:27017"
+    command: mongod --replSet my-mongo-set
+    # command: mongod
+    volumes:
+      - mongo_data1:/data/db
+    restart: always
+    healthcheck: 
+      test: ["CMD-SHELL","echo", "'db.stats().ok' | mongo localhost:27117/test", "--quiet"]
+      interval: 30s
+      timeout: 10s
+      retries: 5  
+    networks:
+      - my-netwk
+    
+  mongo2:
+    container_name: mongo2
+    image: mongo:latest
+    ports:
+      - "27217:27017"
+    command: mongod --replSet my-mongo-set
+    volumes:
+      - mongo_data2:/data/db
+    restart: always
+    networks:
+      - my-netwk
+    
+  mongo3:
+    container_name: mongo3
+    image: mongo:latest
+    command: mongod --replSet my-mongo-set
+    ports:
+      - "27317:27017"
+    volumes:
+      - mongo_data3:/data/db
+    restart: always
+    networks:
+      - my-netwk
+      
+  elasticsearch:
+    container_name: elasticsearch
+    image: elasticsearch:7.0.1
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    restart: always
+    healthcheck:
+      test: "wget -q -O - http://localhost:9200/_cat/health"
+      interval: 1s
+      timeout: 20s
+      retries: 300
+    environment:
+      - discovery.type=single-node
+    networks:
+      - my-netwk
+
+  monstache:
+    container_name: monstache
+    restart: always
+    image: rwynn/monstache:latest
+    expose:
+      - "8080"
+    ports:
+      - "8000:8080"
+    depends_on:
+      mongo1:
+        condition: service_healthy
+      elasticsearch:
+        condition: service_healthy
+    environment:
+      - MONSTACHE_MONGO_URL=mongodb://mongo1:27017
+      - MONSTACHE_ES_URLS=http://elasticsearch:9200
+    links:
+      - elasticsearch
+    networks:
+      - my-netwk
+
+networks:
+  my-netwk:
+volumes:
+  mongo_data1:
+  mongo_data2:
+  mongo_data3:
